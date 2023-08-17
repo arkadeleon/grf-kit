@@ -8,91 +8,84 @@
 import Foundation
 
 class MemoryStream: Stream {
-    fileprivate var _buffer: UnsafeMutableRawPointer
-    private var _capacity: Int
+    fileprivate var storage: UnsafeMutableRawPointer
+    private var capacity: Int
 
-    private var _length: Int
-    private var _position: Int
+    private(set) var length: Int
+    private(set) var position: Int
 
     init() {
-        _buffer = malloc(0)
-        _capacity = 0
-        _length = 0
-        _position = 0
+        storage = malloc(0)
+        capacity = 0
+        length = 0
+        position = 0
     }
 
     init(data: Data) {
-        _buffer = malloc(data.count)
-        _capacity = data.count
-        _length = data.count
-        _position = 0
+        storage = malloc(data.count)
+        capacity = data.count
+        length = data.count
+        position = 0
 
         data.withUnsafeBytes { pointer in
-            let target = UnsafeMutableRawBufferPointer(start: _buffer, count: pointer.count)
+            let target = UnsafeMutableRawBufferPointer(start: storage, count: pointer.count)
             target.copyMemory(from: pointer)
         }
     }
 
     deinit {
-        free(_buffer)
-    }
-
-    var length: Int {
-        _length
-    }
-
-    var position: Int {
-        _position
+        free(storage)
     }
 
     func close() {
     }
 
-    func seek(_ offset: Int, origin: StreamSeekOrigin) throws {
+    func seek(_ offset: Int, origin: SeekOrigin) throws {
         switch origin {
         case .begin:
-            guard offset < _length else {
+            guard offset < length else {
                 throw StreamError.bufferUnderflow
             }
-            _position = offset
+            position = offset
         case .current:
-            guard _position + offset < _length else {
+            guard position + offset < length else {
                 throw StreamError.bufferUnderflow
             }
-            _position += offset
+            position += offset
         case .end:
             guard offset == 0 else {
                 throw StreamError.bufferUnderflow
             }
-            _position = _length - 1
+            position = length - 1
         }
     }
 
-    func read(_ count: Int) throws -> Data {
-        guard _position + count <= _length else {
+    func read(_ buffer: UnsafeMutableRawPointer, count: Int) throws -> Int {
+        guard position + count <= length else {
             throw StreamError.bufferUnderflow
         }
 
-        let data = Data(bytes: _buffer.advanced(by: _position), count: count)
+        buffer.copyMemory(from: storage.advanced(by: position), byteCount: count)
 
-        _position += count
+        position += count
 
-        return data
+        return count
     }
 
-    func write<T>(_ data: T) where T : DataProtocol {
-        _length += data.count
-        _buffer = realloc(_buffer, _length)
+    func write(_ buffer: UnsafeRawPointer, count: Int) throws -> Int {
+        length += count
+        storage = realloc(storage, length)
 
-        let target = UnsafeMutableRawBufferPointer(start: _buffer.advanced(by: _position), count: data.count)
-        data.copyBytes(to: target)
+        storage.advanced(by: position).copyMemory(from: buffer, byteCount: count)
 
-        _position += data.count
+        position += count
+
+        return count
     }
 }
 
 extension Data {
     init(stream: MemoryStream) {
-        self = Data(bytes: stream._buffer, count: stream.length)
+        self = Data(bytes: stream.storage, count: stream.length)
     }
 }

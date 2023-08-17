@@ -5,15 +5,13 @@
 //  Created by Leon Li on 2023/7/21.
 //
 
-import Foundation
-
 enum StreamError: Error {
     case bufferUnderflow
     case endOfStream
     case invalidEncoding
 }
 
-enum StreamSeekOrigin {
+enum SeekOrigin: Int32 {
     case begin
     case current
     case end
@@ -21,12 +19,14 @@ enum StreamSeekOrigin {
 
 protocol Stream {
     var length: Int { get }
+
     var position: Int { get }
 
     func close()
 
-    func seek(_ offset: Int, origin: StreamSeekOrigin) throws
+    func seek(_ offset: Int, origin: SeekOrigin) throws
 
-    func read(_ count: Int) throws -> Data
-    func write<T>(_ data: T) where T : DataProtocol
+    func read(_ buffer: UnsafeMutableRawPointer, count: Int) throws -> Int
+
+    func write(_ buffer: UnsafeRawPointer, count: Int) throws -> Int
 }

@@ -5,10 +5,8 @@
 //  Created by Leon Li on 2023/7/21.
 //
 
-import Foundation
-
 class BinaryReader {
-    private var stream: Stream
+    let stream: Stream
 
     init(stream: Stream) {
         self.stream = stream
@@ -19,23 +17,34 @@ class BinaryReader {
     }
 
     func readInt<T: FixedWidthInteger>() throws -> T {
-        let data = try stream.read(MemoryLayout<T>.size)
-        return data.withUnsafeBytes { $0.load(as: T.self) }
+        let count = MemoryLayout<T>.size
+        var result: T = 0
+        try withUnsafeMutablePointer(to: &result) { pointer in
+            _ = try stream.read(pointer, count: count)
+        }
+        return result
     }
 
     func readFloat<T: FloatingPoint>() throws -> T {
-        let data = try stream.read(MemoryLayout<T>.size)
-        return data.withUnsafeBytes { $0.load(as: T.self) }
+        let count = MemoryLayout<T>.size
+        var result: T = 0
+        try withUnsafeMutablePointer(to: &result) { pointer in
+            _ = try stream.read(pointer, count: count)
+        }
+        return result
     }
 
     func readBytes(_ count: Int) throws -> [UInt8] {
-        let data = try stream.read(count)
-        return [UInt8](data)
+        var bytes = [UInt8](repeating: 0, count: count)
+        try bytes.withUnsafeMutableBytes { pointer in
+            _ = try stream.read(pointer.baseAddress!, count: count)
+        }
+        return bytes
     }
 
-    func readString(_ count: Int, encoding: String.Encoding = .utf8) throws -> String {
-        let data = try stream.read(count)
-        guard let string = String(data: data, encoding: encoding) else {
+    func readString(_ count: Int, encoding: String.Encoding) throws -> String {
+        let bytes = try readBytes(count)
+        guard let string = String(bytes: bytes, encoding: encoding) else {
             throw StreamError.invalidEncoding
         }
         return string

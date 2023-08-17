@@ -8,48 +8,32 @@
 import Foundation
 
 class FileStream: Stream {
-    private let _fileHandle: FileHandle
+    private let file: UnsafeMutablePointer<FILE>
 
-    private var _length: Int
-
-    init(url: URL) throws {
-        _fileHandle = try FileHandle(forUpdating: url)
-        _length = (try FileManager.default.attributesOfItem(atPath: url.path)[.size] as? Int) ?? 0
-    }
-
-    var length: Int {
-        _length
-    }
+    private(set) var length: Int
 
     var position: Int {
-        let offset = try? _fileHandle.offset()
-        return Int(offset ?? 0)
+        ftell(file)
+    }
+
+    init(url: URL) throws {
+        file = fopen(url.path.cString(using: .utf8), "rw+")
+        length = (try FileManager.default.attributesOfItem(atPath: url.path)[.size] as? Int) ?? 0
     }
 
     func close() {
-        do {
-            try _fileHandle.close()
-        } catch {
-            print(error)
-        }
+        fclose(file)
     }
 
-    func seek(_ offset: Int, origin: StreamSeekOrigin) throws {
-        try _fileHandle.seek(toOffset: UInt64(offset))
+    func seek(_ offset: Int, origin: SeekOrigin) throws {
+        fseek(file, offset, origin.rawValue)
     }
 
-    func read(_ count: Int) throws -> Data {
-        guard let data = try _fileHandle.read(upToCount: count) else {
-            throw StreamError.endOfStream
-        }
-        return data
+    func read(_ buffer: UnsafeMutableRawPointer, count: Int) throws -> Int {
+        return fread(buffer, 1, count, file)
     }
 
-    func write<T>(_ data: T) where T : DataProtocol {
-        do {
-            try _fileHandle.write(contentsOf: data)
-        } catch {
-            print(error)
-        }
+    func write(_ buffer: UnsafeRawPointer, count: Int) throws -> Int {
+        return fwrite(buffer, 1, count, file)
     }
 }

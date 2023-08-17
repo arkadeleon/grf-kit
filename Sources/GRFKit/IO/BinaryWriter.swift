@@ -5,10 +5,8 @@
 //  Created by Leon Li on 2023/7/21.
 //
 
-import Foundation
-
 class BinaryWriter {
-    private var stream: Stream
+    let stream: Stream
 
     init(stream: Stream) {
         self.stream = stream
@@ -18,27 +16,32 @@ class BinaryWriter {
         stream.close()
     }
 
-    func write<T: FixedWidthInteger>(_ value: T) {
+    func write<T: FixedWidthInteger>(_ value: T) throws {
+        let count = MemoryLayout<T>.size
         var value = value
-        let data = withUnsafeBytes(of: &value) { Data($0) }
-        stream.write(data)
+        try withUnsafePointer(to: &value) { pointer in
+            _ = try stream.write(pointer, count: count)
+        }
     }
 
-    func write<T: FloatingPoint>(_ value: T) {
+    func write<T: FloatingPoint>(_ value: T) throws {
+        let count = MemoryLayout<T>.size
         var value = value
-        let data = withUnsafeBytes(of: &value) { Data($0) }
-        stream.write(data)
+        try withUnsafePointer(to: &value) { pointer in
+            _ = try stream.write(pointer, count: count)
+        }
     }
 
-    func write(_ value: [UInt8]) {
-        let data = Data(value)
-        stream.write(data)
+    func write(_ value: [UInt8]) throws {
+        _ = try stream.write(value, count: value.count)
     }
 
-    func write(_ value: String, encoding: String.Encoding = .utf8) throws {
+    func write(_ value: String, encoding: String.Encoding) throws {
         guard let data = value.data(using: encoding) else {
             throw StreamError.invalidEncoding
         }
-        stream.write(data)
+        try data.withUnsafeBytes { pointer in
+            _ = try stream.write(pointer.baseAddress!, count: pointer.count)
+        }
     }
 }
